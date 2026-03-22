@@ -1,0 +1,109 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bondbridge-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: bondbridge
+      POSTGRES_PASSWORD: bondbridge_dev
+      POSTGRES_DB: bondbridge
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bondbridge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: bondbridge-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass bondbridge_redis
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "bondbridge_redis", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: bondbridge-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: bondbridge_minio
+      MINIO_ROOT_PASSWORD: bondbridge_minio_secret
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: bondbridge-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+
+      # Database — use Docker service name, not localhost
+      DATABASE_URL: "postgresql://bondbridge:bondbridge_dev@postgres:5432/bondbridge?schema=public"
+
+      # Redis — use Docker service name
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: bondbridge_redis
+
+      # JWT
+      JWT_ACCESS_SECRET: your-access-secret-change-in-production
+      JWT_REFRESH_SECRET: your-refresh-secret-change-in-production
+      JWT_ACCESS_EXPIRY: 15m
+      JWT_REFRESH_EXPIRY: 7d
+
+      # S3 / MinIO — use Docker service name
+      S3_ENDPOINT: "http://minio:9000"
+      S3_ACCESS_KEY: bondbridge_minio
+      S3_SECRET_KEY: bondbridge_minio_secret
+      S3_BUCKET: bondbridge-media
+      S3_REGION: us-east-1
+
+      # CORS
+      CORS_ORIGINS: "http://localhost:3001,http://localhost:8081"
+
+      # App
+      APP_URL: "http://localhost:3000"
+      ADMIN_DASHBOARD_URL: "http://localhost:3001"
+
+      # Verification
+      VERIFICATION_PROVIDER: mock
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:

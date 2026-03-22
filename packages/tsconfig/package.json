@@ -1,0 +1,7 @@
+{
+  "name": "@bondbridge/tsconfig",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "files": ["base.json", "nestjs.json", "nextjs.json", "react-native.json"]
+}

@@ -1,0 +1,890 @@
+// ═══════════════════════════════════════════════════════════════
+// BondBridge — Complete Prisma Schema
+// 30+ models covering: Auth, Profiles, Communities, Challenges,
+// Scoring, Leaderboards, Rewards, Friendship, Dating, Messages,
+// Moderation, Notifications, and Media.
+// ═══════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ──────────────────────────────────────────────────────
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum SocialType {
+  INTROVERT
+  EXTROVERT
+  AMBIVERT
+}
+
+enum CommunicationStyle {
+  TEXT_FIRST
+  VOICE_FIRST
+  VIDEO_FIRST
+  IN_PERSON_FIRST
+}
+
+enum DatingIntent {
+  NOT_INTERESTED
+  OPEN_TO_IT
+  ACTIVELY_LOOKING
+}
+
+enum VerificationStatus {
+  NONE
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum CommunityType {
+  PUBLIC
+  PRIVATE
+  ANONYMOUS
+  INVITE_ONLY
+}
+
+enum CommunityRole {
+  MEMBER
+  MODERATOR
+  ADMIN
+  OWNER
+}
+
+enum ChallengeType {
+  PLATFORM_DAILY
+  COMMUNITY_DAILY
+  COMMUNITY_WEEKLY
+}
+
+enum ChallengeStatus {
+  DRAFT
+  ACTIVE
+  VOTING
+  COMPLETED
+  CANCELLED
+}
+
+enum SubmissionType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  ART
+  PROOF
+}
+
+enum ReactionType {
+  UPVOTE
+  CREATIVE
+  SUPPORTIVE
+  FUNNY
+  THOUGHTFUL
+}
+
+enum DatingStage {
+  MATCHED
+  TEXT_PHASE
+  CHECKPOINT
+  VOICE_UNLOCKED
+  MEET_SUGGESTED
+  POST_DATE
+  CLOSED
+}
+
+enum DatingCloseReason {
+  MUTUAL_CLOSE
+  TIMEOUT
+  REPORTED
+  GHOSTING_DETECTED
+  COMPLETED
+  USER_INITIATED
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  BLOCKED
+}
+
+enum BuddyType {
+  FRIEND
+  TRIO
+  HOBBY_BUDDY
+  ACCOUNTABILITY_BUDDY
+  STUDY_PARTNER
+  WORK_PARTNER
+  ACTIVITY_BUDDY
+}
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  INAPPROPRIATE_CONTENT
+  FAKE_PROFILE
+  SCAM
+  UNDERAGE
+  HATE_SPEECH
+  SELF_HARM
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+enum ReportTargetType {
+  USER
+  POST
+  COMMENT
+  MESSAGE
+  COMMUNITY
+  CHALLENGE_SUBMISSION
+}
+
+enum ModerationActionType {
+  WARNING
+  MUTE
+  BAN
+  CONTENT_REMOVAL
+  SCORE_PENALTY
+  TRUST_REDUCTION
+  ACCOUNT_SUSPENSION
+}
+
+enum NotificationType {
+  CHALLENGE_REMINDER
+  CHALLENGE_RESULT
+  LEADERBOARD_CHANGE
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  DATING_STAGE_CHANGE
+  DATING_NEW_MATCH
+  COMMUNITY_INVITE
+  NEW_MESSAGE
+  BADGE_EARNED
+  REWARD_AVAILABLE
+  STREAK_WARNING
+  REPORT_UPDATE
+  SYSTEM
+}
+
+enum LeaderboardPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+  ALL_TIME
+}
+
+enum LeaderboardCategory {
+  MOST_CREATIVE
+  MOST_SUPPORTIVE
+  MOST_CONSISTENT
+  CHALLENGE_CHAMPION
+  FASTEST_RISING
+  COMMUNITY_HERO
+}
+
+// ─── USER ───────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  phone     String?  @unique
+  password  String
+  role      UserRole @default(USER)
+  isActive  Boolean  @default(true)
+  isBanned  Boolean  @default(false)
+  banReason String?
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  profile           UserProfile?
+  verification      UserVerification?
+  scores            UserScore?
+  settings          UserSettings?
+  refreshTokens     RefreshToken[]
+  communityMembers  CommunityMember[]
+  posts             Post[]
+  comments          Comment[]
+  reactions         Reaction[]
+  challengeSubmissions ChallengeSubmission[]
+  sentFriendRequests     FriendRequest[]    @relation("SentRequests")
+  receivedFriendRequests FriendRequest[]    @relation("ReceivedRequests")
+  datingMatchesAsA  DatingMatch[]  @relation("DatingUserA")
+  datingMatchesAsB  DatingMatch[]  @relation("DatingUserB")
+  datingFeedbackGiven DatingFeedback[] @relation("FeedbackGiver")
+  datingFeedbackReceived DatingFeedback[] @relation("FeedbackReceiver")
+  sentMessages      Message[]      @relation("MessageSender")
+  conversations     ConversationParticipant[]
+  notifications     Notification[]
+  reportsFiled      Report[]       @relation("ReportsFiled")
+  reportsReceived   Report[]       @relation("ReportsReceived")
+  moderationActions ModerationAction[] @relation("ModeratedUser")
+  moderationTaken   ModerationAction[] @relation("ModeratorUser")
+  blocks            Block[]        @relation("Blocker")
+  blockedBy         Block[]        @relation("Blocked")
+  badges            UserBadge[]
+  rewards           UserReward[]
+  streaks           Streak[]
+  leaderboardEntries LeaderboardEntry[]
+  ownedCommunities  Community[]    @relation("CommunityOwner")
+  createdChallenges Challenge[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([role])
+  @@index([isActive, isBanned])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ─── PROFILE ────────────────────────────────────────────────────
+
+model UserProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  displayName     String
+  nickname        String?
+  avatarUrl       String?
+  bio             String?
+  socialType      SocialType       @default(AMBIVERT)
+  communicationStyle CommunicationStyle @default(TEXT_FIRST)
+  datingIntent    DatingIntent     @default(NOT_INTERESTED)
+  friendIntents   String[]         // Array of FriendIntent enum values
+  interests       String[]         // Free-form interest tags
+  vibeTags        String[]         // e.g. ["chill", "adventurous", "nerdy"]
+  city            String?
+  locality        String?
+  latitude        Float?
+  longitude       Float?
+  dateOfBirth     DateTime?
+  gender          String?
+  genderPreference String[]        // For dating matching
+  isAnonymous     Boolean  @default(false)
+  isProfilePublic Boolean  @default(true)
+  showAge         Boolean  @default(true)
+  showCity        Boolean  @default(true)
+  showDistance     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([city])
+  @@index([socialType])
+  @@index([datingIntent])
+  @@index([interests])
+  @@index([vibeTags])
+}
+
+model UserSettings {
+  id                    String  @id @default(cuid())
+  userId                String  @unique
+  pushNotifications     Boolean @default(true)
+  emailNotifications    Boolean @default(false)
+  challengeReminders    Boolean @default(true)
+  friendRequestNotifs   Boolean @default(true)
+  datingNotifs          Boolean @default(true)
+  communityNotifs       Boolean @default(true)
+  leaderboardNotifs     Boolean @default(true)
+  streakReminders       Boolean @default(true)
+  dmFromStrangers       Boolean @default(false)
+  showOnlineStatus      Boolean @default(false)
+  allowFriendRequests   Boolean @default(true)
+  allowDatingMatch      Boolean @default(false)
+  safeMode              Boolean @default(false) // Extra safety filters
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── VERIFICATION ───────────────────────────────────────────────
+
+model UserVerification {
+  id               String             @id @default(cuid())
+  userId           String             @unique
+  status           VerificationStatus @default(NONE)
+  provider         String?            // "digilocker", "mock", etc.
+  providerRefId    String?            // Reference ID from verification provider
+  verifiedName     String?            // Real name (encrypted at rest)
+  verifiedAge      Int?
+  verifiedAt       DateTime?
+  expiresAt        DateTime?
+  rejectionReason  String?
+  attempts         Int                @default(0)
+  metadata         Json?              // Provider-specific metadata
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+// ─── SCORES ─────────────────────────────────────────────────────
+
+model UserScore {
+  id                      String @id @default(cuid())
+  userId                  String @unique
+  participationScore      Int    @default(0)
+  consistencyScore        Int    @default(0)
+  creativityScore         Int    @default(0)
+  supportScore            Int    @default(0)
+  trustScore              Int    @default(50) // Start at 50/100
+  communityContribution   Int    @default(0)
+  overallLevel            Int    @default(1)
+  totalXp                 Int    @default(0)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([trustScore])
+  @@index([overallLevel])
+  @@index([totalXp])
+  @@index([participationScore])
+}
+
+// ─── COMMUNITY ──────────────────────────────────────────────────
+
+model Community {
+  id            String        @id @default(cuid())
+  name          String
+  slug          String        @unique
+  description   String?
+  avatarUrl     String?
+  bannerUrl     String?
+  type          CommunityType @default(PUBLIC)
+  isLocal       Boolean       @default(false)
+  city          String?
+  latitude      Float?
+  longitude     Float?
+  rules         String?
+  memberCount   Int           @default(0)
+  isActive      Boolean       @default(true)
+  ownerId       String
+  metadata      Json?         // Flexible settings
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  owner     User              @relation("CommunityOwner", fields: [ownerId], references: [id])
+  members   CommunityMember[]
+  posts     Post[]
+  challenges Challenge[]
+
+  @@index([slug])
+  @@index([type])
+  @@index([isLocal, city])
+  @@index([memberCount])
+}
+
+model CommunityMember {
+  id          String        @id @default(cuid())
+  userId      String
+  communityId String
+  role        CommunityRole @default(MEMBER)
+  isAnonymous Boolean       @default(false)
+  anonymousName String?
+  joinedAt    DateTime      @default(now())
+  mutedUntil  DateTime?
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  community Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, communityId])
+  @@index([communityId, role])
+}
+
+// ─── POSTS ──────────────────────────────────────────────────────
+
+model Post {
+  id          String   @id @default(cuid())
+  authorId    String
+  communityId String
+  title       String?
+  content     String
+  mediaUrls   String[]
+  isPinned    Boolean  @default(false)
+  isAnonymous Boolean  @default(false)
+  upvoteCount Int      @default(0)
+  commentCount Int     @default(0)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  author    User       @relation(fields: [authorId], references: [id])
+  community Community  @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  comments  Comment[]
+  reactions Reaction[] @relation("PostReactions")
+
+  @@index([communityId, createdAt])
+  @@index([authorId])
+  @@index([communityId, isPinned])
+}
+
+model Comment {
+  id          String   @id @default(cuid())
+  authorId    String
+  postId      String
+  parentId    String?  // For threaded comments
+  content     String
+  mediaUrls   String[]
+  isAnonymous Boolean  @default(false)
+  upvoteCount Int      @default(0)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  author   User       @relation(fields: [authorId], references: [id])
+  post     Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent   Comment?   @relation("CommentThread", fields: [parentId], references: [id])
+  children Comment[]  @relation("CommentThread")
+  reactions Reaction[] @relation("CommentReactions")
+
+  @@index([postId, createdAt])
+  @@index([parentId])
+}
+
+model Reaction {
+  id        String       @id @default(cuid())
+  userId    String
+  type      ReactionType
+  postId    String?
+  commentId String?
+  submissionId String?
+  createdAt DateTime     @default(now())
+
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post       Post?               @relation("PostReactions", fields: [postId], references: [id], onDelete: Cascade)
+  comment    Comment?            @relation("CommentReactions", fields: [commentId], references: [id], onDelete: Cascade)
+  submission ChallengeSubmission? @relation("SubmissionReactions", fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId, type])
+  @@unique([userId, commentId, type])
+  @@unique([userId, submissionId, type])
+  @@index([postId])
+  @@index([commentId])
+  @@index([submissionId])
+}
+
+// ─── CHALLENGES ─────────────────────────────────────────────────
+
+model Challenge {
+  id            String          @id @default(cuid())
+  title         String
+  description   String
+  type          ChallengeType
+  status        ChallengeStatus @default(DRAFT)
+  communityId   String?         // null = platform-wide
+  creatorId     String
+  mediaUrls     String[]
+  submissionTypes SubmissionType[] // Allowed submission types
+  startsAt      DateTime
+  endsAt        DateTime
+  lateEntryUntil DateTime?      // Optional grace period
+  maxSubmissions Int            @default(1)
+  isAnonymousSubmissions Boolean @default(false)
+  rules         String?
+  rewardDescription String?
+  rewardBadgeId String?
+  submissionCount Int           @default(0)
+  metadata      Json?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  creator     User                  @relation(fields: [creatorId], references: [id])
+  community   Community?            @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  submissions ChallengeSubmission[]
+  rewardBadge Badge?                @relation(fields: [rewardBadgeId], references: [id])
+
+  @@index([type, status])
+  @@index([communityId, status])
+  @@index([startsAt, endsAt])
+  @@index([status, type, startsAt])
+}
+
+model ChallengeSubmission {
+  id           String         @id @default(cuid())
+  challengeId  String
+  userId       String
+  type         SubmissionType
+  content      String?
+  mediaUrls    String[]
+  isAnonymous  Boolean        @default(false)
+  upvoteCount  Int            @default(0)
+  rank         Int?
+  isWinner     Boolean        @default(false)
+  isDisqualified Boolean      @default(false)
+  moderationNote String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  challenge Challenge  @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id])
+  reactions Reaction[] @relation("SubmissionReactions")
+
+  @@unique([challengeId, userId]) // One submission per challenge per user
+  @@index([challengeId, upvoteCount])
+  @@index([userId])
+}
+
+// ─── LEADERBOARD ────────────────────────────────────────────────
+
+model LeaderboardEntry {
+  id          String              @id @default(cuid())
+  userId      String
+  period      LeaderboardPeriod
+  category    LeaderboardCategory
+  communityId String?             // null = global
+  score       Int                 @default(0)
+  rank        Int?
+  periodStart DateTime            // e.g. start of day/week/month
+  periodEnd   DateTime
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, period, category, communityId, periodStart])
+  @@index([period, category, communityId, periodStart, score])
+  @@index([rank])
+}
+
+// ─── BADGES + REWARDS ───────────────────────────────────────────
+
+model Badge {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  description String
+  iconUrl     String?
+  category    String     // e.g. "challenge", "community", "social", "dating"
+  rarity      String     @default("common") // common, rare, epic, legendary
+  criteria    Json?      // Programmatic unlock criteria
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+
+  users      UserBadge[]
+  challenges Challenge[]
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeId   String
+  awardedAt DateTime @default(now())
+  source    String?  // "challenge:xyz", "community:abc", "system"
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id])
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+}
+
+model Reward {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  type        String   // "coupon", "premium_perk", "profile_theme", "event_discount"
+  value       Json     // Reward-specific data
+  cost        Int?     // XP cost if purchasable
+  stock       Int?     // null = unlimited
+  claimed     Int      @default(0)
+  isActive    Boolean  @default(true)
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  users UserReward[]
+}
+
+model UserReward {
+  id        String    @id @default(cuid())
+  userId    String
+  rewardId  String
+  claimedAt DateTime  @default(now())
+  usedAt    DateTime?
+  metadata  Json?
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reward Reward @relation(fields: [rewardId], references: [id])
+
+  @@index([userId])
+}
+
+// ─── STREAKS ────────────────────────────────────────────────────
+
+model Streak {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // "daily_challenge", "community_challenge", "login", etc.
+  currentCount Int     @default(0)
+  longestCount Int     @default(0)
+  lastActivityAt DateTime?
+  startsAt    DateTime @default(now())
+  brokenAt    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId, type])
+}
+
+// ─── FRIENDSHIP ─────────────────────────────────────────────────
+
+model FriendRequest {
+  id          String           @id @default(cuid())
+  senderId    String
+  receiverId  String
+  buddyType   BuddyType        @default(FRIEND)
+  status      FriendshipStatus @default(PENDING)
+  message     String?
+  respondedAt DateTime?
+  createdAt   DateTime         @default(now())
+
+  sender   User @relation("SentRequests", fields: [senderId], references: [id])
+  receiver User @relation("ReceivedRequests", fields: [receiverId], references: [id])
+
+  @@unique([senderId, receiverId])
+  @@index([receiverId, status])
+  @@index([senderId, status])
+}
+
+// ─── GUIDED DATING ──────────────────────────────────────────────
+
+model DatingMatch {
+  id              String     @id @default(cuid())
+  userAId         String
+  userBId         String
+  stage           DatingStage @default(MATCHED)
+  isActive        Boolean    @default(true)
+  matchScore      Float?     // How well the algorithm matched them
+  promptsCompleted Int       @default(0)
+  lastActivityAt  DateTime   @default(now())
+  checkpointAApproved Boolean @default(false)
+  checkpointBApproved Boolean @default(false)
+  closeReason     DatingCloseReason?
+  closedBy        String?    // userId who closed
+  closedAt        DateTime?
+  cooldownUntil   DateTime?  // Prevents immediate re-match
+  metadata        Json?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  userA    User             @relation("DatingUserA", fields: [userAId], references: [id])
+  userB    User             @relation("DatingUserB", fields: [userBId], references: [id])
+  feedback DatingFeedback[]
+  prompts  DatingPrompt[]
+
+  // Enforce one active match per user: userAId < userBId to prevent duplicates
+  @@index([userAId, isActive])
+  @@index([userBId, isActive])
+  @@index([stage])
+}
+
+model DatingPrompt {
+  id           String   @id @default(cuid())
+  matchId      String
+  promptText   String
+  responseA    String?
+  responseB    String?
+  order        Int
+  createdAt    DateTime @default(now())
+
+  match DatingMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([matchId, order])
+}
+
+model DatingFeedback {
+  id          String   @id @default(cuid())
+  matchId     String
+  giverId     String
+  receiverId  String
+  rating      Int      // 1-5
+  safetyRating Int?    // 1-5, optional
+  feedback    String?  // Private feedback text
+  flags       String[] // e.g. ["respectful", "ghosted", "uncomfortable"]
+  isPrivate   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  match    DatingMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  giver    User        @relation("FeedbackGiver", fields: [giverId], references: [id])
+  receiver User        @relation("FeedbackReceiver", fields: [receiverId], references: [id])
+
+  @@unique([matchId, giverId])
+  @@index([receiverId])
+}
+
+// ─── MESSAGING ──────────────────────────────────────────────────
+
+model Conversation {
+  id          String     @id @default(cuid())
+  type        String     @default("direct") // "direct", "dating", "group"
+  datingMatchId String?  @unique            // Link to dating match if applicable
+  lastMessageAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([lastMessageAt])
+}
+
+model ConversationParticipant {
+  id             String   @id @default(cuid())
+  userId         String
+  conversationId String
+  lastReadAt     DateTime?
+  isMuted        Boolean  @default(false)
+  joinedAt       DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, conversationId])
+  @@index([userId])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String?
+  mediaUrls      String[]
+  isSystemMessage Boolean @default(false)
+  isDeleted      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("MessageSender", fields: [senderId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+// ─── NOTIFICATIONS ──────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?            // Contextual data (deep link info, IDs, etc.)
+  isRead    Boolean          @default(false)
+  isPushed  Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, type])
+}
+
+// ─── MODERATION ─────────────────────────────────────────────────
+
+model Report {
+  id            String           @id @default(cuid())
+  reporterId    String
+  targetUserId  String?
+  targetType    ReportTargetType
+  targetId      String           // ID of the reported entity
+  reason        ReportReason
+  description   String?
+  status        ReportStatus     @default(PENDING)
+  reviewedBy    String?
+  reviewNote    String?
+  resolvedAt    DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  reporter   User @relation("ReportsFiled", fields: [reporterId], references: [id])
+  targetUser User? @relation("ReportsReceived", fields: [targetUserId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([targetUserId])
+  @@index([targetType, targetId])
+}
+
+model ModerationAction {
+  id          String               @id @default(cuid())
+  userId      String               // User being moderated
+  moderatorId String               // Moderator taking action
+  actionType  ModerationActionType
+  reason      String
+  details     Json?
+  expiresAt   DateTime?            // For timed actions like mutes/bans
+  reportId    String?              // Link to originating report
+  createdAt   DateTime             @default(now())
+
+  user      User @relation("ModeratedUser", fields: [userId], references: [id])
+  moderator User @relation("ModeratorUser", fields: [moderatorId], references: [id])
+
+  @@index([userId])
+  @@index([moderatorId])
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+// ─── MEDIA ──────────────────────────────────────────────────────
+
+model MediaUpload {
+  id          String   @id @default(cuid())
+  userId      String
+  url         String
+  key         String   // S3 key
+  mimeType    String
+  sizeBytes   Int
+  purpose     String   // "avatar", "post", "challenge_submission", "community_banner", etc.
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([purpose])
+}

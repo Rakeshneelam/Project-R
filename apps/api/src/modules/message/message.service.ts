@@ -1,10 +1,15 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '@/common/prisma/prisma.service';
 import { PaginatedResponse } from '@/common/dto';
+import { NotificationService } from '../notification/notification.service';
+
 
 @Injectable()
 export class MessageService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationService: NotificationService,
+  ) {}
 
   async getConversations(userId: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
@@ -87,6 +92,20 @@ export class MessageService {
       where: { id: conversationId },
       data: { lastMessageAt: new Date() },
     });
+
+    // Send push notification to other participants
+    const participants = await this.prisma.conversationParticipant.findMany({
+      where: { conversationId, userId: { not: userId } },
+    });
+    const senderName = message.sender?.profile?.displayName ?? 'Someone';
+    for (const p of participants) {
+      this.notificationService.sendPushNotification(
+        p.userId,
+        `New message from ${senderName}`,
+        message.content ?? '📎 Media',
+        { conversationId, type: 'NEW_MESSAGE' },
+      ).catch(() => {});
+    }
 
     return message;
   }

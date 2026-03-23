@@ -1,8 +1,13 @@
-import { Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Body, Controller, Get, Post, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { NotificationService } from './notification.service';
 import { CurrentUser } from '@/common/decorators';
+
+class RegisterPushTokenDto {
+  token: string;
+  platform: 'ios' | 'android' | 'web';
+}
 
 @ApiTags('notifications')
 @Controller('notifications')
@@ -27,5 +32,16 @@ export class NotificationController {
   @ApiOperation({ summary: 'Mark all notifications as read' })
   async markAllAsRead(@CurrentUser('id') userId: string) {
     return this.notificationService.markAllAsRead(userId);
+  }
+
+  @Post('push-token')
+  @ApiOperation({ summary: 'Register device push token' })
+  @ApiBody({ type: RegisterPushTokenDto })
+  async registerPushToken(
+    @CurrentUser('id') userId: string,
+    @Body() dto: RegisterPushTokenDto,
+  ) {
+    await this.notificationService.registerPushToken(userId, dto.token, dto.platform);
+    return { success: true };
   }
 }

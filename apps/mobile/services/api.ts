@@ -70,3 +70,38 @@ export const profileApi = {
   getUploadUrl: (filename: string, contentType: string) =>
     api.get('/media/upload-url', { params: { filename, contentType } }),
 };
+
+// Messages / Conversations
+export const messagesApi = {
+  getConversations: (page = 1) =>
+    api.get('/messages/conversations', { params: { page, limit: 20 } }),
+  getMessages: (conversationId: string, page = 1) =>
+    api.get(`/messages/conversations/${conversationId}/messages`, { params: { page, limit: 50 } }),
+  sendMessage: (conversationId: string, content: string, mediaUrls?: string[]) =>
+    api.post(`/messages/conversations/${conversationId}/messages`, { content, mediaUrls }),
+  startConversation: (otherUserId: string) =>
+    api.post('/messages/conversations/direct', { otherUserId }),
+};
+
+// Dating
+export const datingApi = {
+  findMatch: () => api.post('/dating/find-match'),
+  getActiveMatch: () => api.get('/dating/active'),
+  respondToPrompt: (matchId: string, promptId: string, response: string) =>
+    api.post(`/dating/${matchId}/prompts/${promptId}/respond`, { response }),
+  approveCheckpoint: (matchId: string) =>
+    api.post(`/dating/${matchId}/checkpoint/approve`),
+  closeMatch: (matchId: string, reason?: string) =>
+    api.post(`/dating/${matchId}/close`, { reason }),
+  submitFeedback: (matchId: string, data: { rating: number; safetyRating?: number; feedback?: string }) =>
+    api.post(`/dating/${matchId}/feedback`, data),
+};
+
+// Notifications
+export const notificationsApi = {
+  getAll: (page = 1) => api.get('/notifications', { params: { page } }),
+  markRead: (id: string) => api.post(`/notifications/${id}/read`),
+  markAllRead: () => api.post('/notifications/read-all'),
+  registerPushToken: (token: string, platform: 'ios' | 'android' | 'web') =>
+    api.post('/notifications/push-token', { token, platform }),
+};

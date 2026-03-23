@@ -7,9 +7,9 @@ import { Colors, Radii, Typography } from '../../constants/theme';
 const TAB_ITEMS = [
   { name: 'index', label: 'Feed', icon: 'home', iconOutline: 'home-outline' },
   { name: 'discover', label: 'Discover', icon: 'compass', iconOutline: 'compass-outline' },
+  { name: 'messages', label: 'Messages', icon: 'chatbubbles', iconOutline: 'chatbubbles-outline' },
   { name: 'create', label: 'Post', icon: 'add-circle', iconOutline: 'add-circle-outline' },
-  { name: 'challenges', label: 'Challenges', icon: 'trophy', iconOutline: 'trophy-outline' },
-  { name: 'leaderboard', label: 'Ranks', icon: 'podium', iconOutline: 'podium-outline' },
+  { name: 'dating', label: 'Dating', icon: 'heart', iconOutline: 'heart-outline' },
   { name: 'profile', label: 'Profile', icon: 'person-circle', iconOutline: 'person-circle-outline' },
 ];
 

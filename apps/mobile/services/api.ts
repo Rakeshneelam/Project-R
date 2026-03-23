@@ -52,12 +52,32 @@ export const communitiesApi = {
   leave: (id: string) => api.delete(`/communities/${id}/leave`),
 };
 
-// Friends
+// Friends / Friendship
 export const friendsApi = {
-  list: () => api.get('/friends'),
+  // Discover matched users via the scoring algorithm
+  discover: (page = 1) => api.get('/friendship/discover', { params: { page, limit: 20 } }),
+  // List accepted friends
+  list: () => api.get('/friendship/friends'),
+  // Send a friend request
+  sendRequest: (receiverId: string, message?: string) =>
+    api.post('/friendship/request', { receiverId, message }),
+  // Accept or decline
+  respond: (requestId: string, accept: boolean) =>
+    api.post(`/friendship/request/${requestId}/respond`, { accept }),
+  // Pending incoming requests
+  pending: () => api.get('/friendship/pending'),
+  // Search users by name/display name
   search: (q: string) => api.get('/users/search', { params: { q } }),
-  sendRequest: (userId: string) => api.post('/friends/request', { userId }),
+  // Save interest profile (writes to UserProfile via PATCH /users/profile)
+  saveInterests: (data: {
+    interests: string[];
+    vibeTags: string[];
+    socialType: string;
+    communicationStyle: string;
+    city?: string;
+  }) => api.patch('/users/profile', data),
 };
+
 
 // Challenges
 export const challengesApi = {

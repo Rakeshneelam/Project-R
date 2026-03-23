@@ -2,10 +2,14 @@ import { Injectable, NotFoundException, ConflictException, BadRequestException }
 import { PrismaService } from '@/common/prisma/prisma.service';
 import { FriendshipStatus, BuddyType } from '@bondbridge/database';
 import { PaginatedResponse } from '@/common/dto';
+import { NotificationService } from '@/modules/notification/notification.service';
 
 @Injectable()
 export class FriendshipService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationService,
+  ) {}
 
   /** Matchmaking engine: find compatible users based on multi-factor scoring */
   async discoverFriends(userId: string, buddyType?: BuddyType, page = 1, limit = 20) {
@@ -31,7 +35,14 @@ export class FriendshipService {
 
     const excludeIds = [...new Set([userId, ...blockedIds, ...connectedIds])];
 
-    // Fetch candidate users
+    // Get the requesting user's community memberships for overlap scoring
+    const userCommunities = await this.prisma.communityMember.findMany({
+      where: { userId },
+      select: { communityId: true },
+    });
+    const userCommunityIds = new Set(userCommunities.map(c => c.communityId));
+
+    // Fetch candidate users with their community memberships
     const candidates = await this.prisma.user.findMany({
       where: {
         id: { notIn: excludeIds },
@@ -39,7 +50,11 @@ export class FriendshipService {
         isBanned: false,
         settings: { allowFriendRequests: true },
       },
-      include: { profile: true, scores: true },
+      include: {
+        profile: true,
+        scores: true,
+        communityMembers: { select: { communityId: true } },
+      },
       take: 100,
     });
 
@@ -86,10 +101,22 @@ export class FriendshipService {
           score += 5;
         }
 
-        // Community overlap
-        // (Skipped for MVP — would require join query, will be added in matchmaking V2)
+        // Community overlap — strongest social signal (0-20 points)
+        const candidateCommunityIds = new Set(candidate.communityMembers.map((cm: any) => cm.communityId));
+        const sharedCommunities = [...userCommunityIds].filter(id => candidateCommunityIds.has(id)).length;
+        score += Math.min(sharedCommunities * 7, 20);
 
-        return { user: candidate, matchScore: score };
+        // FriendIntent overlap (0-5 points)
+        const sharedIntents = user.profile!.friendIntents.filter(i =>
+          candidate.profile!.friendIntents.includes(i),
+        ).length;
+        score += Math.min(sharedIntents * 2, 5);
+
+        // Normalize to 0-100
+        const maxRaw = 100;
+        const normalizedScore = Math.round(Math.min((score / maxRaw) * 100, 100));
+
+        return { user: candidate, matchScore: normalizedScore };
       })
       .sort((a, b) => b.matchScore - a.matchScore);
 
@@ -131,9 +158,23 @@ export class FriendshipService {
     });
     if (existing) throw new ConflictException('Friend request already exists');
 
-    return this.prisma.friendRequest.create({
+    const result = await this.prisma.friendRequest.create({
       data: { senderId, receiverId, buddyType, message },
+      include: {
+        sender: { select: { id: true, profile: { select: { displayName: true } } } },
+      },
     });
+
+    // Push notification to receiver (fire and forget)
+    const senderName = result.sender.profile?.displayName ?? 'Someone';
+    this.notifications.sendPushNotification(
+      receiverId,
+      '👋 New Friend Request',
+      `${senderName} wants to connect with you on BondBridge!`,
+    ).catch(() => {});
+
+    return result;
+
   }
 
   async respondToRequest(requestId: string, userId: string, accept: boolean) {

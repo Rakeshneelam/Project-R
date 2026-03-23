@@ -5,12 +5,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Radii, Typography } from '../../constants/theme';
 
 const TAB_ITEMS = [
-  { name: 'index', label: 'Feed', icon: 'home', iconOutline: 'home-outline' },
-  { name: 'discover', label: 'Discover', icon: 'compass', iconOutline: 'compass-outline' },
-  { name: 'messages', label: 'Messages', icon: 'chatbubbles', iconOutline: 'chatbubbles-outline' },
-  { name: 'create', label: 'Post', icon: 'add-circle', iconOutline: 'add-circle-outline' },
-  { name: 'dating', label: 'Dating', icon: 'heart', iconOutline: 'heart-outline' },
-  { name: 'profile', label: 'Profile', icon: 'person-circle', iconOutline: 'person-circle-outline' },
+  { name: 'index',   label: 'Home',    icon: 'home',         iconOutline: 'home-outline' },
+  { name: 'explore', label: 'Explore', icon: 'compass',      iconOutline: 'compass-outline' },
+  { name: 'create',  label: '',        icon: 'add',          iconOutline: 'add' },
+  { name: 'inbox',   label: 'Inbox',   icon: 'notifications',iconOutline: 'notifications-outline' },
+  { name: 'profile', label: 'Me',      icon: 'person-circle',iconOutline: 'person-circle-outline' },
 ];
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
@@ -27,10 +26,15 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           };
 
           return (
-            <TouchableOpacity key={route.key} style={[styles.tab, isCreate && styles.createTab]} onPress={onPress} activeOpacity={0.7}>
+            <TouchableOpacity
+              key={route.key}
+              style={[styles.tab, isCreate && styles.createTab]}
+              onPress={onPress}
+              activeOpacity={0.7}
+            >
               {isCreate ? (
                 <View style={styles.createBtn}>
-                  <Ionicons name="add" size={26} color={Colors.white} />
+                  <Ionicons name="add" size={28} color={Colors.white} />
                 </View>
               ) : (
                 <>
@@ -65,7 +69,7 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBarContainer: {
-    backgroundColor: 'rgba(10,8,25,0.95)',
+    backgroundColor: 'rgba(10,8,25,0.97)',
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
     paddingBottom: Platform.OS === 'ios' ? 20 : 8,
@@ -77,15 +81,15 @@ const styles = StyleSheet.create({
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 6, gap: 3 },
   createTab: { paddingTop: 0 },
   createBtn: {
-    width: 48, height: 48, borderRadius: 24,
+    width: 52, height: 52, borderRadius: 26,
     backgroundColor: Colors.accent,
     alignItems: 'center', justifyContent: 'center',
     shadowColor: Colors.accent, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5, shadowRadius: 10, elevation: 8,
+    shadowOpacity: 0.55, shadowRadius: 12, elevation: 10,
     marginBottom: 4,
   },
   tabLabel: { fontSize: 10, color: Colors.textMuted },
-  tabLabelActive: { color: Colors.accentLight },
+  tabLabelActive: { color: Colors.accentLight, fontWeight: '600' },
   activeDot: {
     width: 4, height: 4, borderRadius: 2,
     backgroundColor: Colors.accentLight,

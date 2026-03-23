@@ -46,9 +46,17 @@ export const postsApi = {
 export const communitiesApi = {
   getAll: (search?: string) => api.get('/communities', { params: { search } }),
   getJoined: () => api.get('/communities/joined'),
+  getMine: () => api.get('/communities/me'),
   getById: (id: string) => api.get(`/communities/${id}`),
   join: (id: string) => api.post(`/communities/${id}/join`),
   leave: (id: string) => api.delete(`/communities/${id}/leave`),
+};
+
+// Friends
+export const friendsApi = {
+  list: () => api.get('/friends'),
+  search: (q: string) => api.get('/users/search', { params: { q } }),
+  sendRequest: (userId: string) => api.post('/friends/request', { userId }),
 };
 
 // Challenges
